@@ -65,7 +65,7 @@ So, unchanged and not to be weakened:
    self-hosted runner, macOS/arm64). During `./config.sh`, give it the labels
    `macos` and `release`:
    ```bash
-   ./config.sh --url https://github.com/johnnylibretexts/libretexts-reader \
+   ./config.sh --url https://github.com/johnnylibretexts-ai/libretexts-reader \
      --token <REG_TOKEN> --labels macos,release --name jr-release-mac --ephemeral
    ```
    `--ephemeral` makes the runner take exactly one job and then **delete its own
@@ -105,8 +105,8 @@ So, unchanged and not to be weakened:
 # 2. Register AND start the runner on the release Mac. Both, every release --
 #    the previous run deleted the registration on its way out.
 cd ~/actions-runner
-./config.sh --url https://github.com/johnnylibretexts/libretexts-reader \
-  --token "$(gh api -X POST repos/johnnylibretexts/libretexts-reader/actions/runners/registration-token --jq .token)" \
+./config.sh --url https://github.com/johnnylibretexts-ai/libretexts-reader \
+  --token "$(gh api -X POST repos/johnnylibretexts-ai/libretexts-reader/actions/runners/registration-token --jq .token)" \
   --labels macos,release --name jr-release-mac --ephemeral --unattended
 ./run.sh            # takes one job, then exits and deregisters itself
 # 3. Push the tag:
@@ -130,8 +130,8 @@ token each time (they expire in about an hour):
 
 ```bash
 cd ~/actions-runner
-./config.sh --url https://github.com/johnnylibretexts/libretexts-reader \
-  --token "$(gh api -X POST repos/johnnylibretexts/libretexts-reader/actions/runners/registration-token --jq .token)" \
+./config.sh --url https://github.com/johnnylibretexts-ai/libretexts-reader \
+  --token "$(gh api -X POST repos/johnnylibretexts-ai/libretexts-reader/actions/runners/registration-token --jq .token)" \
   --labels macos,release --name jr-release-mac --ephemeral --unattended
 ./run.sh
 ```

@@ -198,7 +198,7 @@ finish() {
 ENV_FILE="${ENV_FILE:-$HOME/.config/libretexts-reader/release-setup.env}"
 mkdir -p "$(dirname "$ENV_FILE")"
 
-REPO="johnnylibretexts/libretexts-reader"
+REPO="johnnylibretexts-ai/libretexts-reader"
 EXPECTED_GH_ACCOUNT="johnnylibretexts"
 RUNNER_DIR="$HOME/actions-runner"
 

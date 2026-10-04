@@ -86,7 +86,7 @@ Pre-commit/verification gate: `npm run build`, `npm test`, `cargo test -p libret
 
 ### Issue tracker
 
-Issues live in GitHub Issues on `johnnylibretexts/libretexts-reader` (public since
+Issues live in GitHub Issues on `johnnylibretexts-ai/libretexts-reader` (public since
 v0.1.0-beta.2), driven via the `gh` CLI. Note this machine also holds credentials for the `johnnyrobot` account this project was developed under — confirm the active account before writes. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels

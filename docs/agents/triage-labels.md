@@ -21,8 +21,8 @@ by default). Create the missing four once, against the tracker repo named in
 [`issue-tracker.md`](./issue-tracker.md):
 
 ```sh
-gh label create needs-triage    --repo johnnylibretexts/libretexts-reader --color FBCA04 --description "Maintainer needs to evaluate this issue"
-gh label create needs-info      --repo johnnylibretexts/libretexts-reader --color D4C5F9 --description "Waiting on reporter for more information"
-gh label create ready-for-agent --repo johnnylibretexts/libretexts-reader --color 0E8A16 --description "Fully specified, ready for an AFK agent"
-gh label create ready-for-human --repo johnnylibretexts/libretexts-reader --color 1D76DB --description "Requires human implementation"
+gh label create needs-triage    --repo johnnylibretexts-ai/libretexts-reader --color FBCA04 --description "Maintainer needs to evaluate this issue"
+gh label create needs-info      --repo johnnylibretexts-ai/libretexts-reader --color D4C5F9 --description "Waiting on reporter for more information"
+gh label create ready-for-agent --repo johnnylibretexts-ai/libretexts-reader --color 0E8A16 --description "Fully specified, ready for an AFK agent"
+gh label create ready-for-human --repo johnnylibretexts-ai/libretexts-reader --color 1D76DB --description "Requires human implementation"
 ```

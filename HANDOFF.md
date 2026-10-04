@@ -10,7 +10,7 @@ Last updated: 2026-08-24
 > `docs/adr/` and `docs/agents/` are unaffected and still tracked.
 
 > **The public beta is cut, and the repo is public.**
-> [**v0.1.0-beta.2**](https://github.com/johnnylibretexts/libretexts-reader/releases/tag/v0.1.0-beta.2)
+> [**v0.1.0-beta.2**](https://github.com/johnnylibretexts-ai/libretexts-reader/releases/tag/v0.1.0-beta.2)
 > is published as a GitHub pre-release — signed, notarized, stapled on both the DMG *and*
 > the inner `.app`, produced by `release.yml` running unattended from a tag, and verified by
 > downloading the artifact rather than trusting the green check. Johnny then drove it by
@@ -41,21 +41,21 @@ Last updated: 2026-08-24
 
 This repo is a Tauri desktop app for reading and listening to OpenStax, LibreTexts, Pressbooks, EPUB, PDF, pasted text, and article imports with local TTS. It is in public beta as of 2026-08-23.
 
-**Pressbooks is a third content Source, shipped 2026-08-18.** [PR #35](https://github.com/johnnylibretexts/libretexts-reader/pull/35) merged 15 commits as `aaf0e7d`, closing the epic #19 and all eight of its children. A reader can browse Pressbooks Catalogs with a picker, search a crawled cache as they type, add a book in one click, see its cover in the Library, and hear its equations — Pressbooks renders those to images and keeps the LaTeX in the `alt`, which import recovers as a `[[latex:<base64>]]` token that KaTeX typesets and the speech path says aloud.
+**Pressbooks is a third content Source, shipped 2026-08-18.** [PR #35](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/35) merged 15 commits as `aaf0e7d`, closing the epic #19 and all eight of its children. A reader can browse Pressbooks Catalogs with a picker, search a crawled cache as they type, add a book in one click, see its cover in the Library, and hear its equations — Pressbooks renders those to images and keeps the LaTeX in the `alt`, which import recovers as a `[[latex:<base64>]]` token that KaTeX typesets and the speech path says aloud.
 
-One follow-up fix merged behind it: [PR #36](https://github.com/johnnylibretexts/libretexts-reader/pull/36) (`0532eb3`) names the SQLite busy timeout the app relies on rather than inheriting it from rusqlite.
+One follow-up fix merged behind it: [PR #36](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/36) (`0532eb3`) names the SQLite busy timeout the app relies on rather than inheriting it from rusqlite.
 
-And [PR #37](https://github.com/johnnylibretexts/libretexts-reader/pull/37) (`0a6ea2d`) closed #31. An image download used to accept a response if *either* its content type or its URL extension looked like an image, so a WAF block page served `200 text/html` for `.../cover.png` was written to disk as a PNG and hung on the Library card. It now decides on the body — sniffed magic bytes — or on what the server said, never on the URL alone. Both signals have to stay, and the PR body says why: servers that will not guess send a genuine PNG as `application/octet-stream`, and a format the sniffer does not know is still an image when the server says so.
+And [PR #37](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/37) (`0a6ea2d`) closed #31. An image download used to accept a response if *either* its content type or its URL extension looked like an image, so a WAF block page served `200 text/html` for `.../cover.png` was written to disk as a PNG and hung on the Library card. It now decides on the body — sniffed magic bytes — or on what the server said, never on the URL alone. Both signals have to stay, and the PR body says why: servers that will not guess send a genuine PNG as `application/octet-stream`, and a format the sniffer does not know is still an image when the server says so.
 
 **Five open tickets closed in one session, 2026-08-18/19: #33, #29, #28, #34, #32 — all merged to `main`.**
 
-- **#33** ([PR #39](https://github.com/johnnylibretexts/libretexts-reader/pull/39), `3fe7a5c`) — `word_count` on a Pressbooks TOC entry is now `Option<u32>`. `push_readable` gates on `has_post_content` alone and only excludes a *measured* zero, so a Catalog that never sends the field no longer imports as an empty book.
-- **#29** ([PR #40](https://github.com/johnnylibretexts/libretexts-reader/pull/40), `81177af`) — `verify_offered_book_url` now also rejects a non-`https` scheme, an explicit port, and embedded userinfo, not just an unoffered host.
-- **#28** ([PR #41](https://github.com/johnnylibretexts/libretexts-reader/pull/41), `372bf3b`) — `source_page_cache` (shared by LibreTexts and Pressbooks since migration `0008`; the `libretexts_cache` table the issue named no longer exists) now expires a read after a 7-day TTL, and `delete_document` clears a LibreTexts Document's cached pages when the Document is deleted. **Landed narrower than the issue asked, on purpose**: there is no cheap way to revalidate via `content_revision` without a full fetch (unlike OpenStax's `archive_release` manifest), so this is TTL-only rather than the revalidate-then-TTL policy the issue floated. Don't reopen that as a gap without a lightweight revision-check endpoint to build it on.
-- **#34** ([PR #42](https://github.com/johnnylibretexts/libretexts-reader/pull/42), `71ed16c`) — the Pressbooks `catalog-progress` listener effect was declared *after* the effect that starts the crawl. `crawl_catalog` reports progress synchronously before issuing any request, so the first event was always emitted into a window with no subscriber. Fixed by swapping the declaration order — React runs effects in declaration order.
-- **#32** ([PR #43](https://github.com/johnnylibretexts/libretexts-reader/pull/43), `5990b87`) — the flaky test was `PressbooksBrowser.test.tsx > search > "answers a search typed while the first catalog is still loading"`. Reproduced on iteration 5 of an 80-run loop of the *full* suite; 40 runs of just the two files the issue suspected never reproduced it in isolation — the race needs the full suite's CPU contention, matching the issue's own observation. Root cause: a Catalog's arrival renders both its books from the raw listing for one tick before the search resolves and narrows them; the test's `waitFor` polled for a book title present in *both* that transient tick and the final state, then a synchronous check right after raced the search's still-pending promise. Fixed by folding the negative assertion into the same `waitFor` callback instead of lengthening any timeout. A sibling test had the identical shape and the identical latent race and was fixed the same way, though it never itself reproduced. **Verified: 100 consecutive full-suite runs, zero failures**, after 0 in the first 40 isolated-file runs and a hit on run 5 of 80 full-suite runs — the isolation detail is worth keeping if this class of flake resurfaces elsewhere.
+- **#33** ([PR #39](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/39), `3fe7a5c`) — `word_count` on a Pressbooks TOC entry is now `Option<u32>`. `push_readable` gates on `has_post_content` alone and only excludes a *measured* zero, so a Catalog that never sends the field no longer imports as an empty book.
+- **#29** ([PR #40](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/40), `81177af`) — `verify_offered_book_url` now also rejects a non-`https` scheme, an explicit port, and embedded userinfo, not just an unoffered host.
+- **#28** ([PR #41](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/41), `372bf3b`) — `source_page_cache` (shared by LibreTexts and Pressbooks since migration `0008`; the `libretexts_cache` table the issue named no longer exists) now expires a read after a 7-day TTL, and `delete_document` clears a LibreTexts Document's cached pages when the Document is deleted. **Landed narrower than the issue asked, on purpose**: there is no cheap way to revalidate via `content_revision` without a full fetch (unlike OpenStax's `archive_release` manifest), so this is TTL-only rather than the revalidate-then-TTL policy the issue floated. Don't reopen that as a gap without a lightweight revision-check endpoint to build it on.
+- **#34** ([PR #42](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/42), `71ed16c`) — the Pressbooks `catalog-progress` listener effect was declared *after* the effect that starts the crawl. `crawl_catalog` reports progress synchronously before issuing any request, so the first event was always emitted into a window with no subscriber. Fixed by swapping the declaration order — React runs effects in declaration order.
+- **#32** ([PR #43](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/43), `5990b87`) — the flaky test was `PressbooksBrowser.test.tsx > search > "answers a search typed while the first catalog is still loading"`. Reproduced on iteration 5 of an 80-run loop of the *full* suite; 40 runs of just the two files the issue suspected never reproduced it in isolation — the race needs the full suite's CPU contention, matching the issue's own observation. Root cause: a Catalog's arrival renders both its books from the raw listing for one tick before the search resolves and narrows them; the test's `waitFor` polled for a book title present in *both* that transient tick and the final state, then a synchronous check right after raced the search's still-pending promise. Fixed by folding the negative assertion into the same `waitFor` callback instead of lengthening any timeout. A sibling test had the identical shape and the identical latent race and was fixed the same way, though it never itself reproduced. **Verified: 100 consecutive full-suite runs, zero failures**, after 0 in the first 40 isolated-file runs and a hit on run 5 of 80 full-suite runs — the isolation detail is worth keeping if this class of flake resurfaces elsewhere.
 
-**One new ticket, opened and fixed in the same session: #44**, filed after PR #43's own CI run hung for the full 6-hour GitHub Actions per-job cap before being force-cancelled — on a two-line test-assertion diff that explains nothing about a 6-hour hang. The culprit step, `Install Linux build dependencies` (a plain `apt-get update && apt-get install`, `.github/workflows/ci.yml:52`), timed between 47 seconds and 28 minutes across other runs and, on that one run, indefinitely. [PR #45](https://github.com/johnnylibretexts/libretexts-reader/pull/45) (`ed54958`) adds `timeout-minutes: 60` to the `verify` job, and **merged after its own CI run passed in 9m56s** — comfortably inside the new bound, so 60 minutes does not clip a normal run.
+**One new ticket, opened and fixed in the same session: #44**, filed after PR #43's own CI run hung for the full 6-hour GitHub Actions per-job cap before being force-cancelled — on a two-line test-assertion diff that explains nothing about a 6-hour hang. The culprit step, `Install Linux build dependencies` (a plain `apt-get update && apt-get install`, `.github/workflows/ci.yml:52`), timed between 47 seconds and 28 minutes across other runs and, on that one run, indefinitely. [PR #45](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/45) (`ed54958`) adds `timeout-minutes: 60` to the `verify` job, and **merged after its own CI run passed in 9m56s** — comfortably inside the new bound, so 60 minutes does not clip a normal run.
 
 **Verified in the real app on 2026-08-20, after all six landed.** `npm run tauri -- build --debug --no-bundle` built in 1m05s, and `./target/debug/libretexts-reader` launched, ran, and quit cleanly with no crash report and empty stderr. The app was driven, not merely launched, and it opened on Pressbooks — the surface four of the six fixes touched: the Catalog showed its progress indicator and then listed 90 Milne books with covers, authors and licences, and typing `logic` narrowed to the single match with no stale cards left behind. That last one is the exact behaviour #32's flaky test asserts, working live.
 
@@ -66,7 +66,7 @@ Two incidental facts from that run, neither a defect but both able to waste an h
 
 **There is no other work in progress as of this update.** The standing caution against `git reset --hard` applies to any new WIP.
 
-The Fish Audio provider (spec B) merged on 2026-08-16 via [PR #4](https://github.com/johnnylibretexts/libretexts-reader/pull/4) — 39 commits, merge commit `64ead91`, reviewed with all 15 findings resolved.
+The Fish Audio provider (spec B) merged on 2026-08-16 via [PR #4](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/4) — 39 commits, merge commit `64ead91`, reviewed with all 15 findings resolved.
 
 **#30 is closed as not reproducible**, and the reasoning is worth not repeating: it asserted that no `busy_timeout` was set, but `rusqlite` applies 5000ms to every connection it opens, and the test the ticket demanded passed against unmodified code. **Reproduce a ticket's defect before building for it** — write the test it asks for and watch it fail first. `/code-review` findings on this repo have twice been wrong about their own premise.
 
@@ -142,7 +142,7 @@ Copying only the project folder will not copy the local library, downloaded book
 
 Three PRs, three issues closed. `main` at `fa7829c`.
 
-**#54 → [PR #99](https://github.com/johnnylibretexts/libretexts-reader/pull/99)** — Fish playback
+**#54 → [PR #99](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/99)** — Fish playback
 billed the reader with no warning and no way to stop it. **Its premise was verified first, and
 one claim was wrong**: "Pausing does not stop the charge" is overbroad — `fillSpeechBuffer`'s
 workers re-check the utterance token between sentences, so Pause already abandoned the queued
@@ -163,8 +163,8 @@ API key field. `SPEECH_ENGINE_BILLS` is the one declaration of whether an engine
 **A Rust cancellation channel was deliberately not built** — Fish bills on generation, so
 dropping the connection mid-request leaves the reader charged *and* without the audio.
 
-**#50 → [PR #100](https://github.com/johnnylibretexts/libretexts-reader/pull/100) and
-[PR #101](https://github.com/johnnylibretexts/libretexts-reader/pull/101)** — licence
+**#50 → [PR #100](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/100) and
+[PR #101](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/101)** — licence
 compliance. **No LGPL component is bundled any more.**
 
 - **ffmpeg was bundled and never used, ever.** `git log --all -S"ffmpeg" -- src-tauri/src/`
@@ -287,7 +287,7 @@ none of them milestone-gating.
 
 ### Release: the pipeline ran itself, and v0.1.0-beta.1 is published (2026-08-23)
 
-**[v0.1.0-beta.1](https://github.com/johnnylibretexts/libretexts-reader/releases/tag/v0.1.0-beta.1)**
+**[v0.1.0-beta.1](https://github.com/johnnylibretexts-ai/libretexts-reader/releases/tag/v0.1.0-beta.1)**
 — GitHub pre-release, `LibreTexts Reader_0.1.0-beta.1_aarch64.dmg`, 16,107,717 bytes,
 SHA-256 `50a4dcf9…531d`. Built and published by `release.yml` from tag `v0.1.0-beta.1` →
 `f1125eb`, unattended, all 14 steps green in 7m20s. Two notarization submissions
@@ -354,7 +354,7 @@ swallowed errors (#62). Written up after the download thread below.
 (#66), and imported books' licence and attribution were captured and then used nowhere (#51).
 Both are prerequisites for a beta that is still gated on #48.
 
-**#52 → [PR #86](https://github.com/johnnylibretexts/libretexts-reader/pull/86)** (`ebea718`) —
+**#52 → [PR #86](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/86)** (`ebea718`) —
 the first Play fetched 383 MB behind one static string with all eight playback controls
 disabled, so a working download and a hung app looked identical for several minutes. There is
 now a determinate bar (`156 MB of 383 MB · 41%`) in both the reader header and the mini player,
@@ -377,7 +377,7 @@ chunk, so Cancel drops the HTTP stream mid-file instead of finishing the 256 MB 
 deliberately **not** a `static` — the crate's tests run as threads in one process and would
 share it.
 
-**#87 → [PR #89](https://github.com/johnnylibretexts/libretexts-reader/pull/89)** (`5135ded`) —
+**#87 → [PR #89](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/89)** (`5135ded`) —
 and that Cancel button is what made the next defect reachable on purpose rather than only by bad
 luck. A failed download threw away every byte fetched for the file in flight, so the single
 256 MB file could fail at 90% and start again from byte zero, repeatedly. `download_verified`
@@ -416,7 +416,7 @@ makes a test un-failable against the old code, mutate the new code until the tes
 repo's "revert the fix and watch the test fail" rule has no purchase there, and skipping the
 step leaves a test that asserts nothing.
 
-**#88 → [PR #91](https://github.com/johnnylibretexts/libretexts-reader/pull/91)** (`0585e1c`) —
+**#88 → [PR #91](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/91)** (`0585e1c`) —
 the third and last of the chain, filed off the back of #86 and taken the same day. Two surfaces
 can ask for the model — the player on first Play, and the Settings Download button — and nothing
 kept them apart. Both cleared the same cancel flag on entry, so a Cancel the reader had already
@@ -454,7 +454,7 @@ managed type compiles clean either way, so every `State<'_, T>` any command take
 against `lib.rs` by hand. If you add or change managed state, do that audit — the test suite will
 not do it for you.
 
-**#76 → [PR #93](https://github.com/johnnylibretexts/libretexts-reader/pull/93)** (`d9a3b6d`) —
+**#76 → [PR #93](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/93)** (`d9a3b6d`) —
 `AppShell` switch-renders routes, so a trip to the Library unmounts the Reader outright and the
 chapter-export panel's Voice and Language went with it. A new `chapterExport` store holds them
 for the session. Deliberately **not** the `supertonic_voice_style` / `supertonic_language` rows:
@@ -470,10 +470,10 @@ it guards. The `seedSignal`-computed-during-render rule from #78 is unchanged, a
 now falls back to the app default during render so the `<select>` cannot go uncontrolled in the
 commit hydration lands — a fallback that deliberately does **not** make `seeded` true.
 
-**#62 → [PR #94](https://github.com/johnnylibretexts/libretexts-reader/pull/94)** (`b6ebb17`) —
+**#62 → [PR #94](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/94)** (`b6ebb17`) —
 four `catch` sites that disabled something durable with no sign. Three were as reported. The
 fourth was not, and **the ticket is now the third on this repo to be wrong about its own
-premise** — see the [premise comment](https://github.com/johnnylibretexts/libretexts-reader/issues/62#issuecomment-5382266557),
+premise** — see the [premise comment](https://github.com/johnnylibretexts-ai/libretexts-reader/issues/62#issuecomment-5382266557),
 posted before any code was written.
 
 - **Two dead subscriptions** (import progress, library auto-refresh) swallowed a failed
@@ -502,7 +502,7 @@ could not express. And **at a prefetch concurrency of 2 a single failure is invi
 other worker absorbs it — so the test fails a contiguous run and asserts on the stranded tail.
 Run 8× for stability, given #32.
 
-**#66 → [PR #96](https://github.com/johnnylibretexts/libretexts-reader/pull/96)** (`66e8727`) —
+**#66 → [PR #96](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/96)** (`66e8727`) —
 `release.yml` ran **no tests at all**. `RELEASE.md` listed a pre-publish gate; the workflow ran
 none of it, and a tag can point at any commit, so the automated path could publish a tree
 `ci.yml` had never validated.
@@ -532,7 +532,7 @@ because the empty-pubkey check below catches the same input. A status-only asser
 nothing, and the reader would have been told the *pubkey* was missing when the whole *block*
 was. That case now asserts the message.
 
-**#51 → [PR #97](https://github.com/johnnylibretexts/libretexts-reader/pull/97)** (`22a2af5`) —
+**#51 → [PR #97](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/97)** (`22a2af5`) —
 licence and attribution were captured at import and used nowhere: the only licence on screen was
 pre-import, and a chapter MP3 left as a derivative work with the credit stripped.
 
@@ -559,7 +559,7 @@ in the README, **so #50 does not inherit a fresh gap from it** — bundling `LIC
 
 ### Session of 2026-08-21 — five PRs, four issues closed
 
-**#78 → [PR #80](https://github.com/johnnylibretexts/libretexts-reader/pull/80)** — the three
+**#78 → [PR #80](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/80)** — the three
 low-severity findings from the #60 review. A Fish voice save started from the *Your voices*
 dropdown set `savedFrom` and rendered it nowhere, so it spun and went silent; both controls now
 confirm, in **separate** live regions (a shared one would mark a control the reader never
@@ -576,27 +576,27 @@ render** — which settings snapshot the drafts came from, against the one this 
 it is false in the very commit a change arrives. If you touch that effect, keep the derivation;
 a boolean set by the seeding effect cannot work.
 
-**[PR #81](https://github.com/johnnylibretexts/libretexts-reader/pull/81)** — a test that failed
+**[PR #81](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/81)** — a test that failed
 **5 runs in 12**. `findByLabelText("Your voices")` can resolve in the commit where `keyStatus`
 has landed but the voices effect has not yet set `loadingVoices`, so the `<select>` is on screen
 holding only "No voice models yet". **Wait on the `<option>`, not the label** — that is the
 house pattern in that file now.
 
-**#49 → [PR #82](https://github.com/johnnylibretexts/libretexts-reader/pull/82)** — the repo is
+**#49 → [PR #82](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/82)** — the repo is
 on **`0.1.0-beta.1`**. The version lives in **five** files, not the three `check-version.sh`
 guards: the lockfiles matter because `release.yml` runs `npm ci`, which fails outright when
 `package-lock.json` disagrees with `package.json`. The stale local `v0.1.0-beta` tag (188 commits
 behind, never pushed) is deleted. Two User-Agents hardcoded the version and were lying to
 Pressbooks servers and huggingface.co; both now derive from `CARGO_PKG_VERSION` with a test each.
 
-**#48 → [PR #83](https://github.com/johnnylibretexts/libretexts-reader/pull/83)** —
+**#48 → [PR #83](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/83)** —
 `scripts/release-setup.sh` walks the four human-only provisioning steps and ends by dispatching
 the dry run. **Everything it provisions is now in place and #48 is closed** (2026-08-23); the
 snapshot that used to sit here — 0 identities, zero runners, zero repo variables, no `jr-notary`
 profile — described 2026-08-21 and is no longer true. The wizard is still the right entry point
 on a *fresh* Mac.
 
-**#53 → [PR #84](https://github.com/johnnylibretexts/libretexts-reader/pull/84)** — Delete now
+**#53 → [PR #84](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/84)** — Delete now
 confirms, naming the book, from both the trash button and the context menu. Built on the native
 `<dialog>`; **Cancel is first in the DOM on purpose**, because `showModal()` focuses the first
 focusable child and on a destructive confirmation that must never be the destructive button.
@@ -624,7 +624,7 @@ models enough of the spec for component tests.
 
 ### 5. The Supertonic voice style reaches playback (2026-08-21, `38c9fc5`)
 
-[PR #77](https://github.com/johnnylibretexts/libretexts-reader/pull/77) closed #60.
+[PR #77](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/77) closed #60.
 Playback had ignored the Voice style setting entirely: `player.ts` seeded a shared
 `voice: "M1"` field that no component ever set, so every request carried the literal
 `"M1"`. Export, Preview and Test each read the setting themselves, so the control looked
@@ -851,7 +851,7 @@ All of that work is **discarded, not committed**. The tree was returned to clean
 
 Two things happened, both fully merged to `main` and pushed.
 
-**1. Repository moved.** `johnnyrobot/johnny-reader` → **`johnnylibretexts/libretexts-reader`** (private). `origin` was repointed and all branches preserved before cleanup; `main` is now the only branch. The old public repo still exists, untouched — anything previously pushed there is still public. This machine holds `gh` credentials for **both** accounts; confirm the active one (`gh auth status`) before any write. Issues now live on the new repo: see `docs/agents/issue-tracker.md`.
+**1. Repository moved.** `johnnyrobot/johnny-reader` → **`johnnylibretexts-ai/libretexts-reader`** (private). `origin` was repointed and all branches preserved before cleanup; `main` is now the only branch. The old public repo still exists, untouched — anything previously pushed there is still public. This machine holds `gh` credentials for **both** accounts; confirm the active one (`gh auth status`) before any write. Issues now live on the new repo: see `docs/agents/issue-tracker.md`.
 
 **2. Renamed *Johnny Reader* → *LibreTexts Reader*.** Five risk-tiered commits (`566ad5f`..`8dd2298`) plus a review fix wave (`a8b1565`):
 
@@ -868,7 +868,7 @@ Design and plan: `docs/superpowers/specs/2026-08-13-rename-libretexts-reader-des
 
 **Not verified, and worth doing on the next import:** cover and figure rendering. There was no library on this machine, so the identifier/`$APPDATA` coupling has not been exercised end to end with real images. That is the one failure mode that produces no error — see `check-identifier.sh` and the asset-protocol gotcha.
 
-**Open issues** on `johnnylibretexts/libretexts-reader`: **20 as of 2026-08-20** (#48-#69, less #56 and #68 closed by the private-beta decision),
+**Open issues** on `johnnylibretexts-ai/libretexts-reader`: **20 as of 2026-08-20** (#48-#69, less #56 and #68 closed by the private-beta decision),
 all from the release-readiness audit — see "Known Limitations And Next Steps" below for
 the map. This paragraph previously read "none as of 2026-08-17", which was true then and
 is a good reminder that a hand-maintained count goes stale silently; prefer
@@ -1247,19 +1247,19 @@ v0.1.0-beta.1 tag run on 2026-08-23. The caution that used to sit here — "do n
 'the release pipeline works'" — has been satisfied rather than removed.
 
 **Cleared 2026-08-22** — the whole first-run download chain, in one day. #52, made visible and
-cancellable ([PR #86](https://github.com/johnnylibretexts/libretexts-reader/pull/86), `ebea718`);
-#87, made resumable ([PR #89](https://github.com/johnnylibretexts/libretexts-reader/pull/89),
+cancellable ([PR #86](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/86), `ebea718`);
+#87, made resumable ([PR #89](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/89),
 `5135ded`); and #88, made single-flight
-([PR #91](https://github.com/johnnylibretexts/libretexts-reader/pull/91), `0585e1c`). Each was
+([PR #91](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/91), `0585e1c`). Each was
 found by the one before it. Then two more the same day, off the milestone: **#76** (the
 chapter-export panel forgot its voice,
-[PR #93](https://github.com/johnnylibretexts/libretexts-reader/pull/93), `d9a3b6d`) and **#62**
+[PR #93](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/93), `d9a3b6d`) and **#62**
 (four silent error swallows,
-[PR #94](https://github.com/johnnylibretexts/libretexts-reader/pull/94), `b6ebb17`). Then the
+[PR #94](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/94), `b6ebb17`). Then the
 release thread: **#66** (release.yml ran no tests,
-[PR #96](https://github.com/johnnylibretexts/libretexts-reader/pull/96), `66e8727`) and **#51**
+[PR #96](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/96), `66e8727`) and **#51**
 (licence and attribution surfaced and tagged,
-[PR #97](https://github.com/johnnylibretexts/libretexts-reader/pull/97), `22a2af5`).
+[PR #97](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/97), `22a2af5`).
 
 **Eight issues, ten PRs, every CI run green first try.** Tests went 209 Rust / 203 frontend to
 226 / 240. All are written up under "Session of 2026-08-22" in Recently Landed.
@@ -1274,13 +1274,13 @@ thing at fault.**
 both the cancel flag and the single download slot. Read the #88 entry before touching either.
 
 **Cleared 2026-08-21** — #60, the voice-style setting reaching playback
-([PR #77](https://github.com/johnnylibretexts/libretexts-reader/pull/77), `38c9fc5`). See
+([PR #77](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/77), `38c9fc5`). See
 "5. The Supertonic voice style reaches playback" under Recently Landed for the invariants
 it established; read that before touching playback or the settings store.
 
 **Not blocking the beta, filed off the back of #60:** #78 (three low-severity review items,
 one a real regression — a Fish voice picked from the dropdown shows no save confirmation),
-closed 2026-08-21 by [PR #80](https://github.com/johnnylibretexts/libretexts-reader/pull/80),
+closed 2026-08-21 by [PR #80](https://github.com/johnnylibretexts-ai/libretexts-reader/pull/80),
 and **#76 (the chapter-export panel forgets its voice when the Reader unmounts), still open**.
 Neither was ever on the milestone.
 
